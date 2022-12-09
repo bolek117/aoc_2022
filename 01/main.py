@@ -1,7 +1,7 @@
 from typing import List
 
 
-def header(msg: txt) -> None:
+def header(msg: str) -> None:
     print(f'\n--- {msg} ---')
 
 
