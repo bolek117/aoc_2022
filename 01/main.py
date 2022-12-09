@@ -48,7 +48,7 @@ def main():
     elfs = get_elfs()
     max_calories = max([e.sum for e in elfs])
 
-    print('\n--- Part 1 ---')
+    header('Part 1')
     print(max_calories)
 
 
