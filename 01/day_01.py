@@ -26,7 +26,7 @@ def elfs_list(elfs: List[Elf]) -> str:
 
 
 def get_elfs():
-    with open('input.txt', 'r') as f:
+    with open('input_day_01.txt', 'r') as f:
         file_data = f.readlines()
 
     elfs = []
