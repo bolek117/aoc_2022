@@ -1,8 +1,6 @@
 from typing import List
 
-
-def header(msg: str) -> None:
-    print(f'\n--- {msg} ---')
+from helpers import header
 
 
 class Elf:
