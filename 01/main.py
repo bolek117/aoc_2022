@@ -21,6 +21,10 @@ class Elf:
         return self.__str__()
 
 
+def elfs_list(elfs: List[Elf]) -> str:
+    return '\n'.join([str(e) for e in elfs])
+
+
 def get_elfs():
     with open('input.txt', 'r') as f:
         file_data = f.readlines()
@@ -39,17 +43,28 @@ def get_elfs():
         elf.add_calories(calories)
 
     elfs.append(elf)
-    print('\n'.join([str(e) for e in elfs]))
+    print(elfs_list(elfs))
 
     return elfs
 
 
+def sort_by_calories(elfs: List[Elf]) -> List[Elf]:
+    sorted_by_calories = sorted(elfs, key=lambda x: x.sum, reverse=True)
+    return sorted_by_calories
+
+
 def main():
     elfs = get_elfs()
-    max_calories = max([e.sum for e in elfs])
 
     header('Part 1')
+    max_calories = max([e.sum for e in elfs])
     print(max_calories)
+
+    header('Part 2')
+    sorted_by_calories = sort_by_calories(elfs)
+    top_3 = sorted_by_calories[:3]
+    print(elfs_list(top_3))
+    print('Sum:', sum([c.sum for c in top_3]))
 
 
 if __name__ == '__main__':
