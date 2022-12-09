@@ -1,6 +1,10 @@
 from typing import List
 
 
+def header(msg: txt) -> None:
+    print(f'\n--- {msg} ---')
+
+
 class Elf:
     def __init__(self):
         self.sum: int = 0
