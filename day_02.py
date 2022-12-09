@@ -3,10 +3,13 @@ from typing import List, Tuple
 
 from helpers import header
 
+points_rock = 1
+points_paper = 2
+points_scissors = 3
 
 class Move:
-    def __init__(self, name: str, points: int, is_opponent: bool):
-        self.move = name
+    def __init__(self, points: int, is_opponent: bool):
+        self.move = 'rock' if points == 1 else 'paper' if points == 2 else 'scissors' if points == 3 else -1
         self.points = points
         self.is_opponent = is_opponent
 
@@ -19,19 +22,32 @@ class Move:
 
 
 def map_move_sign_to_move(move_sign: str) -> Move:
-    rock = ['A', 'X']
-    paper = ['B', 'Y']
-    scissors = ['C', 'Z']
+    move_sign = move_sign[0].lower()
 
-    move_sign = move_sign[0].upper()
-    if move_sign in rock:
-        return Move('rock', 1, move_sign == 'A')
-    elif move_sign in paper:
-        return Move('paper', 2, move_sign == 'B')
-    elif move_sign in scissors:
-        return Move('scissors', 3, move_sign == 'C')
+    if move_sign in ['a', 'b', 'c']:
+        sign_points = 1 if move_sign == 'a' else 2 if move_sign == 'b' else 3
+        return Move(sign_points, True)
 
-    return Move('UNKNOWN', -1, True)
+    return Move(-1, True)
+
+
+def map_move_to_strategy(move_sign: str, op_move: Move) -> Move:
+    move_sign = move_sign[0].lower()
+    expected_move = ''
+    if move_sign == 'x':    # loose
+        expected_move = points_paper if op_move.points == points_scissors else \
+                        points_scissors if op_move.points == points_rock else \
+                        points_rock
+    elif move_sign == 'y':  # draw
+        expected_move = points_rock if op_move.points == points_rock else \
+                        points_scissors if op_move.points == points_scissors else \
+                        points_paper
+    elif move_sign == 'z':  # win
+        expected_move = points_rock if op_move.points == points_scissors else \
+                        points_scissors if op_move.points == points_paper else \
+                        points_paper
+
+    return Move(expected_move, False)
 
 
 def get_strategy() -> List[Tuple[Move, Move]]:
@@ -43,9 +59,9 @@ def get_strategy() -> List[Tuple[Move, Move]]:
     lines = [line.strip() for line in lines]
     result = []
     for line in lines:
-        me = map_move_sign_to_move(line[0])
-        opponent = map_move_sign_to_move(line[2])
-        result.append((me, opponent))
+        opponent = map_move_sign_to_move(line[0])
+        me = map_move_to_strategy(line[2], opponent)
+        result.append((opponent, me))
 
     return result
 
