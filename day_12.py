@@ -145,31 +145,65 @@ class Clusters:
         return possible_moves
 
 
-def find_route(clusters: Clusters, pos_start: Pos, pos_end: Pos) -> List[Pos]:
-    possible_moves = clusters.get_possible_moves_from(pos_start)
+class Step:
+    def __init__(self, this: Pos, n: Pos):
+        self.this = this
+        self.next = n
 
-    if pos_end in possible_moves:
-        return possible_moves
+    def __str__(self):
+        return f'({self.this.x},{self.this.y})->({self.next.x},{self.next.y})'
 
-    tree = []
+    def __repr__(self):
+        return str(self)
+
+
+def find_route(clusters: Clusters, pos: Pos, prev: Pos) -> List[Step]:
+    result = []
+
+    possible_moves = clusters.get_possible_moves_from(pos)
+
     for move in possible_moves:
-        next_moves = clusters.get_possible_moves_from(move)
-        tree.append([move, next_moves])
+        if move == prev:
+            continue
 
-    pass
+        s = Step(pos, move)
+        result.append(s)
+
+    return result
 
 
 def main():
     map = load_map()
-    pos_start = find_value(map, VAL_START)
-    pos_end = find_value(map, VAL_END)
+    pos_start = find_value(map, VAL_START)[0]
+    pos_end = find_value(map, VAL_END)[0]
 
     # pos_z = find_value(map, get_height('z'))
     # pos_a = find_value(map, get_height('a'))
 
     clusters_arr = make_clusters(map)
     clusters = Clusters(clusters_arr)
-    find_route(clusters, pos_start[0], pos_end[0])
+    routes = find_route(clusters, pos_start, pos_start)
+
+    for s in range(1 * 100):
+        print(f'Step {s}')
+        print()
+
+        possible = []
+        for step in routes:
+            next_steps = find_route(clusters, Pos(step.next.x, step.next.y, 1), step.this)
+
+            for next_step in next_steps:
+                possible.append(Step(step.next, next_step.next))
+
+                if next_step.next == pos_end:
+                    print(s + 2)
+                    return
+
+            routes = possible
+            pass
+
+            print(f'Possible ways: {len(possible)}')
+
     pass
 
 
