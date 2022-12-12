@@ -7,6 +7,7 @@ points_rock = 1
 points_paper = 2
 points_scissors = 3
 
+
 class Move:
     def __init__(self, points: int, is_opponent: bool):
         self.move = 'rock' if points == 1 else 'paper' if points == 2 else 'scissors' if points == 3 else -1
@@ -34,18 +35,18 @@ def map_move_sign_to_move(move_sign: str) -> Move:
 def map_move_to_strategy(move_sign: str, op_move: Move) -> Move:
     move_sign = move_sign[0].lower()
     expected_move = ''
-    if move_sign == 'x':    # loose
+    if move_sign == 'x':  # loose
         expected_move = points_paper if op_move.points == points_scissors else \
-                        points_scissors if op_move.points == points_rock else \
-                        points_rock
+            points_scissors if op_move.points == points_rock else \
+            points_rock
     elif move_sign == 'y':  # draw
         expected_move = points_rock if op_move.points == points_rock else \
-                        points_scissors if op_move.points == points_scissors else \
-                        points_paper
+            points_scissors if op_move.points == points_scissors else \
+            points_paper
     elif move_sign == 'z':  # win
         expected_move = points_rock if op_move.points == points_scissors else \
-                        points_scissors if op_move.points == points_paper else \
-                        points_paper
+            points_scissors if op_move.points == points_paper else \
+            points_paper
 
     return Move(expected_move, False)
 
