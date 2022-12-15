@@ -1,6 +1,6 @@
 import re
 import sys
-from typing import List
+from typing import List, Dict
 
 from helpers import header
 
@@ -20,30 +20,42 @@ class Point:
 
         raise ValueError(f'Unable to find point description in `{txt}`')
 
-    def __str__(self):
+    def pos(self) -> str:
         return f'({self.x},{self.y})'
 
+    def __str__(self):
+        return self.pos()
+
     def __repr__(self):
-        return str(self)
+        return self.pos()
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, Point):
+            return False
+
+        return other.x == self.x and other.y == self.y
+
+    def __hash__(self) -> int:
+        return int(f'{self.x:07d}{self.y:07d}')
 
 
-class Sensor:
+class Definition:
     def __init__(self, sensor: Point, closest_beacon: Point):
-        self.sensor = sensor
-        self.beacon = closest_beacon
+        self.sensor_pos = sensor
+        self.beacon_pos = closest_beacon
 
     def __str__(self):
-        return f'S:{str(self.sensor)},B:{str(self.beacon)}'
+        return f'{str(self.sensor_pos)},{str(self.beacon_pos)}'
 
     def __repr__(self):
         return str(self)
 
 
-def load_sensors(filename: str) -> List[Sensor]:
+def load_sensors(filename: str) -> List[Definition]:
     with open(filename, 'r') as f:
         lines = f.readlines()
 
-    result: List[Sensor] = []
+    result: List[Definition] = []
     for line in lines:
         line = line.strip()
         parts = line.split(': ')
@@ -51,7 +63,7 @@ def load_sensors(filename: str) -> List[Sensor]:
         sensor_pos = Point.from_text(parts[0])
         beacon_pos = Point.from_text(parts[1])
 
-        sensor = Sensor(sensor_pos, beacon_pos)
+        sensor = Definition(sensor_pos, beacon_pos)
         result.append(sensor)
 
     return result
@@ -63,68 +75,100 @@ BEACON: int = 4
 NO_BEACON: int = 8
 
 
+def int_to_chr(val: int) -> str:
+    return '.' if val == UNKNOWN else 'S' if val == SENSOR else 'B' if val == BEACON else '#'
+
+
 class World:
-    def __init__(self, world: List[List[int]], min_x: int, min_y: int, max_x: int, max_y: int):
-        self.max_y: int = max_y
-        self.max_x: int = max_x
-        self.min_y: int = min_y
-        self.min_x: int = min_x
-        self.world: List[List[int]] = world
+    def __init__(self, sensors: List[Definition]):
+        self.max: Point = Point(0, 0)
+        self.min: Point = Point(0, 0)
+        self.world: Dict[Point, int] = dict()
+
+        self.fill(sensors)
+
+    def as_list(self) -> List[List[Point | int]]:
+        return [[k, v] for k, v in self.world.items()]
 
     def __str__(self):
-        result = []
-
-        def get_letter(i: int) -> str:
-            if i == UNKNOWN:
-                return '.'
-            elif i == BEACON:
-                return 'B'
-            elif i == SENSOR:
-                return 'S'
-            else:
-                return 'X'
-
-        for row in self.world:
-            row_str = ''.join([get_letter(i) for i in row])
-            result.append(row_str)
-
-        result = '\n'.join(result)
+        elements = self.as_list()
+        result = ''.join(str(elements))
         return result
 
-    def get_real_x(self, x: int) -> int:
-        return x + self.min_x
+    def get_at(self, pos: Point) -> int:
+        if pos not in self.world.keys():
+            return UNKNOWN
 
-    def get_real_y(self, y: int) -> int:
-        return y + self.min_y
+        return self.world[pos]
 
-    def get_real_pos(self, point: Point) -> Point:
-        real_x = point.x - self.min_x
-        real_y = point.y - self.min_y
+    def world_str(self) -> str:
+        result = []
+        for y in range(min(0, self.min.y), self.max.y):
+            row = []
 
-        return Point(real_x, real_y)
+            for x in range(min(0, self.min.x), self.max.x):
+                point = Point(x, y)
+                value = self.get_at(point)
+                letter = int_to_chr(value)
 
-    def fill(self, sensors: List[Sensor]) -> 'World':
+                row.append(letter)
+
+            result.append(''.join(row))
+
+        world_str = [f'{row}\n' for row in result]
+        return ''.join(world_str)
+
+    def dump(self) -> None:
+        world_str = self.world_str()
+        with open('day_15_output.txt', 'w') as f:
+            for row in world_str():
+                f.write(row)
+
+    def fill(self, sensors: List[Definition]) -> 'World':
+        def update_bounds(new_point: Point):
+            self.max = Point(max(new_point.x, self.max.x), max(new_point.y, self.max.y))
+            self.min = Point(min(new_point.x, self.min.x, 0), min(new_point.y, self.min.y, 0))
 
         for s in sensors:
-            sensor = self.get_real_pos(s.sensor)
-            beacon = self.get_real_pos(s.beacon)
+            self.world[s.sensor_pos] = SENSOR
+            self.world[s.beacon_pos] = BEACON
 
-            self.world[sensor.y][sensor.x] = SENSOR
-            self.world[beacon.y][beacon.x] = BEACON
+            update_bounds(s.sensor_pos)
+            update_bounds(s.beacon_pos)
+
+        if self.max.x < 50:
+            print(self.world_str())
+
+        return self
+
+    def fill_restrictions(self, definitions: List[Definition]) -> 'World':
+        for s in definitions:
+            dist_x = abs(s.sensor_pos.x - s.beacon_pos.x)
+            dist_y = abs(s.sensor_pos.y - s.beacon_pos.y)
+
+            dist = dist_x + dist_y
+            min_x = s.sensor_pos.x - dist
+            max_x = s.sensor_pos.x + dist
+
+            min_y = s.sensor_pos.y - dist
+            max_y = s.sensor_pos.y + dist
+
+
+            pass
 
         return self
 
 
-def prepare_empty_world(sensors: List[Sensor]) -> World:
+def prepare_empty_world(sensors: List[Definition]) -> World:
     x_set = set()
     y_set = set()
 
     for s in sensors:
-        x_set.add(s.sensor.x)
-        x_set.add(s.beacon.x)
+        x_set.add(s.sensor_pos.x)
+        x_set.add(s.beacon_pos.x)
 
-        y_set.add(s.sensor.y)
-        y_set.add(s.beacon.y)
+        y_set.add(s.sensor_pos.y)
+        y_set.add(s.beacon_pos.y)
 
     min_x = min(x_set)
     max_x = max(x_set)+1
@@ -144,10 +188,6 @@ def prepare_empty_world(sensors: List[Sensor]) -> World:
         result.append(row)
 
     world = World(result, min_x, min_y, max_x, max_y)
-    if world.max_x < 50:
-        header('Empty world')
-        print(world)
-
     return world
 
 
@@ -161,14 +201,12 @@ def day_15():
     filename = f'input_day_15{"_" + sys.argv[1] if len(sys.argv) > 1 else ""}.txt'
     sensors = load_sensors(filename)
 
-    header('Creating empty world')
-    empty_world = prepare_empty_world(sensors)
-    debug = empty_world.max_x < 50
-    log(empty_world)
-
     header('Filling world')
-    world = empty_world.fill(sensors)
-    print(world)
+    world = World(sensors)
+    log(world.world_str())
+
+    header('Calculating restrictions')
+    restricted_world = world.fill_restrictions(sensors)
     pass
 
 
