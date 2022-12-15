@@ -1,5 +1,8 @@
+import math
 import sys
 from typing import List, Tuple
+
+import astar
 
 VAL_START = 0
 VAL_END = ord('z')-ord('a')+2
@@ -23,9 +26,14 @@ class Pos:
 
         return self.x == other.x and self.y == other.y
 
+    def __hash__(self):
+        s = f'{self.x:03d}{self.y:03d}'
+        h = int(s)
+        return h
+
 
 def load_map() -> (List[List[Pos]]):
-    test_suffix = '' if len(sys.argv) == 1 else '_test'
+    test_suffix = '' if len(sys.argv) == 1 else '_' + sys.argv[1]
     filename = f'input_day_12{test_suffix}.txt'
 
     with open(filename, 'r') as f:
@@ -35,7 +43,6 @@ def load_map() -> (List[List[Pos]]):
     result = []
 
     x = 0
-    y = 0
     for line in lines:
         y = 0
         row = []
@@ -54,9 +61,9 @@ def load_map() -> (List[List[Pos]]):
     return result
 
 
-def find_value(map: List[List[Pos]], value: int) -> List[Pos]:
+def find_value(world_map: List[List[Pos]], value: int) -> List[Pos]:
     result = []
-    for row in map:
+    for row in world_map:
         for p in row:
             if p.height == value:
                 result.append(p)
@@ -64,146 +71,86 @@ def find_value(map: List[List[Pos]], value: int) -> List[Pos]:
     return result
 
 
-def get_height(character: str) -> int:
-    return ord(character[0])-ord('a')+1
+class AstarImpl(astar.AStar):
+    def __init__(self, map: List[List[Pos]]):
+        self.map: List[List[Pos]] = map
+
+    def heuristic_cost_estimate(self, current: Pos, goal: Pos) -> float:
+        x_diff = abs(goal.x - current.x)
+        y_diff = abs(goal.y - current.x)
+
+        dist_square = math.pow(x_diff, 2) + math.pow(y_diff, 2)
+        dist = math.sqrt(dist_square)
+
+        return dist * 2
+
+    def distance_between(self, n1: Pos, n2: Pos) -> float:
+        diff = n2.height - n1.height
+        if diff <= 1:
+            return 1
+
+        return 1e9999999
+
+    def neighbors(self, node: Pos) -> List[Pos]:
+        x, y = node.x, node.y
+        result = []
+
+        def is_valid_pos(row: int, column: int) -> bool:
+            return 0 <= row < len(self.map) and 0 <= column < len(self.map[0])
+
+        if is_valid_pos(x-1, y):
+            result.append(self.map[x-1][y])
+
+        if is_valid_pos(x+1, y):
+            result.append(self.map[x+1][y])
+
+        if is_valid_pos(x, y-1):
+            result.append(self.map[x][y-1])
+
+        if is_valid_pos(x, y+1):
+            result.append(self.map[x][y+1])
+
+        return result
+
+    def is_goal_reached(self, current: Pos, goal: Pos) -> bool:
+        return current.x == goal.x and current.y == goal.y
 
 
-class Cluster:
-    def __init__(self, cluster: List[Pos]):
-        self.e = cluster
+def save_route(route: List[Pos], world: List[List[Pos]]):
+    rows, columns = len(world), len(world[0])
+    result = [[' ' for _ in range(columns)] for _ in range(rows)]
 
-        center = self.e[4]
-        self.center: Tuple = (center.x, center.y)
+    for p in route:
+        result[p.x][p.y] = chr(world[p.x][p.y].height + ord('a')-1)
 
-    def __str__(self):
-        r1 = self.e[0:2]
-        r2 = self.e[3:5]
-        r3 = self.e[6:8]
+    txt = []
+    for r in result:
+        line = ''.join([str(s) for s in r])
+        txt.append(line)
 
-        def row_str(row: List[Pos]):
-            return ', '.join([str(i) for i in row])
-
-        return f'{row_str(r1)}; {row_str(r2)}; {row_str(r3)}'
-
-    def __repr__(self):
-        return str(self)
-
-
-def make_clusters(map: List[List[Pos]]) -> List[Cluster]:
-    rows = len(map)
-    columns = len(map[0])
-
-    result = []
-    for i in range(rows):
-        for j in range(columns):
-            base = map[i][j]
-
-            def val(x, y) -> Pos:
-                if x < 0 or x >= rows or y < 0 or y >= columns:
-                    return Pos(x, y, -100)
-
-                r = map[x][y]
-                return Pos(x, y, r.height - base.height)
-
-            forbidden = val(-1, -1)
-            cluster = [
-                forbidden,      val(i-1, j),    forbidden,
-                val(i, j-1),    base,           val(i, j+1),
-                forbidden,      val(i+1, j),    forbidden,
-            ]
-
-            result.append(Cluster(cluster))
-
-    return result
-
-
-class Clusters:
-    def __init__(self, clusters: List[Cluster]):
-        self.clusters = clusters
-
-    def get_cluster_for(self, pos: Pos):
-        for cluster in self.clusters:
-            center = cluster.center
-            if center[0] != pos.x or center[1] != pos.y:
-                continue
-
-            return cluster
-
-        raise Exception(f'Not found in clusters: {pos}')
-
-    def get_possible_moves_from(self, pos: Pos) -> List[Pos]:
-        cluster = self.get_cluster_for(pos)
-
-        possible_moves = []
-        for e in cluster.e:
-            if e.x == pos.x and e.y == pos.y:
-                continue
-
-            if e.height == 0 or e.height == 1:
-                possible_moves.append(e)
-
-        return possible_moves
-
-
-class Step:
-    def __init__(self, this: Pos, n: Pos):
-        self.this = this
-        self.next = n
-
-    def __str__(self):
-        return f'({self.this.x},{self.this.y})->({self.next.x},{self.next.y})'
-
-    def __repr__(self):
-        return str(self)
-
-
-def find_route(clusters: Clusters, pos: Pos, prev: Pos) -> List[Step]:
-    result = []
-
-    possible_moves = clusters.get_possible_moves_from(pos)
-
-    for move in possible_moves:
-        if move == prev:
-            continue
-
-        s = Step(pos, move)
-        result.append(s)
-
-    return result
+    lines = '\n'.join(txt)
+    with open('day_12_output.txt', 'w') as f:
+        f.write(lines)
 
 
 def main():
-    map = load_map()
-    pos_start = find_value(map, VAL_START)[0]
-    pos_end = find_value(map, VAL_END)[0]
+    world_map = load_map()
+    pos_start = find_value(world_map, VAL_START)[0]
+    pos_end = find_value(world_map, VAL_END)[0]
 
-    # pos_z = find_value(map, get_height('z'))
-    # pos_a = find_value(map, get_height('a'))
+    finder = AstarImpl(world_map)
+    route = finder.astar(pos_start, pos_end)
 
-    clusters_arr = make_clusters(map)
-    clusters = Clusters(clusters_arr)
-    routes = find_route(clusters, pos_start, pos_start)
+    route = list(route)
+    i = 0
+    for p in route:
+        print(i, p)
+        i += 1
 
-    for s in range(1 * 100):
-        print(f'Step {s}')
-        print()
+    steps = len(route) - 1
+    print(f'Steps: {steps}')
 
-        possible = []
-        for step in routes:
-            next_steps = find_route(clusters, Pos(step.next.x, step.next.y, 1), step.this)
-
-            for next_step in next_steps:
-                possible.append(Step(step.next, next_step.next))
-
-                if next_step.next == pos_end:
-                    print(s + 2)
-                    return
-
-            routes = possible
-            pass
-
-            print(f'Possible ways: {len(possible)}')
-
+    save_route(route, world_map)
     pass
 
 
