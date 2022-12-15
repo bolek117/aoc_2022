@@ -36,7 +36,11 @@ class Point:
         return other.x == self.x and other.y == self.y
 
     def __hash__(self) -> int:
-        return int(f'{self.x:07d}{self.y:07d}')
+        x_str = f'{self.x:07d}'.replace('-', '9')
+        y_str = f'{self.y:07d}'.replace('-', '9')
+        combined = f'{x_str}{y_str}'
+
+        return int(combined)
 
 
 class Definition:
@@ -96,6 +100,9 @@ class World:
         return result
 
     def get_at(self, pos: Point) -> int:
+        if pos.x > self.max.x or pos.x < self.min.x or pos.y < self.min.y or pos.y > self.max.y:
+            raise IndexError(f'Point at {pos} does not exists')
+
         if pos not in self.world.keys():
             return UNKNOWN
 
@@ -104,7 +111,7 @@ class World:
     def world_str(self) -> str:
         result = []
         for y in range(min(0, self.min.y), self.max.y):
-            row = []
+            row = [f'{y:03d} ']
 
             for x in range(min(0, self.min.x), self.max.x):
                 point = Point(x, y)
@@ -121,39 +128,45 @@ class World:
     def dump(self) -> None:
         world_str = self.world_str()
         with open('day_15_output.txt', 'w') as f:
-            for row in world_str():
-                f.write(row)
+            f.write(world_str)
+
+    def update_bounds(self, new_point: Point) -> None:
+        self.max = Point(max(new_point.x, self.max.x) + 1, max(new_point.y, self.max.y) + 1)
+        self.min = Point(min(new_point.x, self.min.x, 0), min(new_point.y, self.min.y, 0))
 
     def fill(self, sensors: List[Definition]) -> 'World':
-        def update_bounds(new_point: Point):
-            self.max = Point(max(new_point.x, self.max.x), max(new_point.y, self.max.y))
-            self.min = Point(min(new_point.x, self.min.x, 0), min(new_point.y, self.min.y, 0))
-
         for s in sensors:
             self.world[s.sensor_pos] = SENSOR
             self.world[s.beacon_pos] = BEACON
 
-            update_bounds(s.sensor_pos)
-            update_bounds(s.beacon_pos)
-
-        if self.max.x < 50:
-            print(self.world_str())
+            self.update_bounds(s.sensor_pos)
+            self.update_bounds(s.beacon_pos)
 
         return self
 
     def fill_restrictions(self, definitions: List[Definition]) -> 'World':
+        def d(p1: Point, p2: Point) -> int:
+            dx = abs(p1.x - p2.x)
+            dy = abs(p1.y - p2.y)
+
+            return dx + dy
+
         for s in definitions:
-            dist_x = abs(s.sensor_pos.x - s.beacon_pos.x)
-            dist_y = abs(s.sensor_pos.y - s.beacon_pos.y)
+            sensor_beacon_dist = d(s.sensor_pos, s.beacon_pos)
+            min_pos = Point(s.sensor_pos.x - sensor_beacon_dist, s.sensor_pos.y - sensor_beacon_dist)
+            max_pos = Point(s.sensor_pos.x + sensor_beacon_dist, s.sensor_pos.y + sensor_beacon_dist)
 
-            dist = dist_x + dist_y
-            min_x = s.sensor_pos.x - dist
-            max_x = s.sensor_pos.x + dist
+            self.update_bounds(min_pos)
+            self.update_bounds(max_pos)
 
-            min_y = s.sensor_pos.y - dist
-            max_y = s.sensor_pos.y + dist
+            for i in range(min_pos.y+1, max_pos.y):
+                for j in range(min_pos.x+1, max_pos.x):
+                    p = Point(j, i)
+                    dist = d(s.sensor_pos, p)
+                    val_at = self.get_at(p)
 
-
+                    if dist < sensor_beacon_dist and val_at == UNKNOWN:
+                        self.world[p] = '#'
             pass
 
         return self
@@ -192,13 +205,13 @@ def prepare_empty_world(sensors: List[Definition]) -> World:
 
 
 def day_15():
-    debug = False
+    is_test = len(sys.argv) > 1
 
     def log(txt) -> None:
-        if debug:
+        if is_test:
             print(txt)
 
-    filename = f'input_day_15{"_" + sys.argv[1] if len(sys.argv) > 1 else ""}.txt'
+    filename = f'input_day_15{"_" + sys.argv[1] if is_test else ""}.txt'
     sensors = load_sensors(filename)
 
     header('Filling world')
@@ -207,6 +220,8 @@ def day_15():
 
     header('Calculating restrictions')
     restricted_world = world.fill_restrictions(sensors)
+    log(restricted_world.world_str())
+    world.dump()
     pass
 
 
