@@ -101,7 +101,7 @@ class World:
 
     def get_at(self, pos: Point) -> int:
         if pos.x > self.max.x or pos.x < self.min.x or pos.y < self.min.y or pos.y > self.max.y:
-            raise IndexError(f'Point at {pos} does not exists')
+            return UNKNOWN
 
         if pos not in self.world.keys():
             return UNKNOWN
@@ -109,11 +109,14 @@ class World:
         return self.world[pos]
 
     def world_str(self) -> str:
-        result = []
-        for y in range(min(0, self.min.y), self.max.y):
+        start_y, end_y = min(0, self.min.y), self.max.y
+        start_x, end_x = min(0, self.min.x), self.max.x
+
+        result = [f'   {self.min.x} -> {self.max.x}']
+        for y in range(start_y, end_y):
             row = [f'{y:03d} ']
 
-            for x in range(min(0, self.min.x), self.max.x):
+            for x in range(start_x, end_x):
                 point = Point(x, y)
                 value = self.get_at(point)
                 letter = int_to_chr(value)
@@ -123,6 +126,7 @@ class World:
             result.append(''.join(row))
 
         world_str = [f'{row}\n' for row in result]
+
         return ''.join(world_str)
 
     def dump(self) -> None:
@@ -131,8 +135,15 @@ class World:
             f.write(world_str)
 
     def update_bounds(self, new_point: Point) -> None:
-        self.max = Point(max(new_point.x, self.max.x) + 1, max(new_point.y, self.max.y) + 1)
-        self.min = Point(min(new_point.x, self.min.x, 0), min(new_point.y, self.min.y, 0))
+
+        max_x = max(new_point.x + 1, self.max.x)
+        max_y = max(new_point.y + 1, self.max.y)
+
+        min_x = min(new_point.x, self.min.x, 0)
+        min_y = min(new_point.y, self.min.y, 0)
+
+        self.max = Point(max_x, max_y)
+        self.min = Point(min_x, min_y)
 
     def fill(self, sensors: List[Definition]) -> 'World':
         for s in sensors:
@@ -153,16 +164,16 @@ class World:
 
         for s in definitions:
             sensor_beacon_dist = d(s.sensor_pos, s.beacon_pos)
-            min_pos = Point(s.sensor_pos.x - sensor_beacon_dist, s.sensor_pos.y - sensor_beacon_dist)
-            max_pos = Point(s.sensor_pos.x + sensor_beacon_dist, s.sensor_pos.y + sensor_beacon_dist)
+            min_pos = Point(s.sensor_pos.x - sensor_beacon_dist - 1, s.sensor_pos.y - sensor_beacon_dist - 1)
+            max_pos = Point(s.sensor_pos.x + sensor_beacon_dist + 1, s.sensor_pos.y + sensor_beacon_dist + 1)
 
             self.update_bounds(min_pos)
             self.update_bounds(max_pos)
 
-            for i in range(min_pos.y+1, max_pos.y):
-                for j in range(min_pos.x+1, max_pos.x):
+            for i in range(min_pos.y-1, max_pos.y+1):
+                for j in range(min_pos.x-1, max_pos.x+1):
                     p = Point(j, i)
-                    dist = d(s.sensor_pos, p)
+                    dist = d(s.sensor_pos, p) - 1
                     val_at = self.get_at(p)
 
                     if dist < sensor_beacon_dist and val_at == UNKNOWN:
@@ -170,38 +181,6 @@ class World:
             pass
 
         return self
-
-
-def prepare_empty_world(sensors: List[Definition]) -> World:
-    x_set = set()
-    y_set = set()
-
-    for s in sensors:
-        x_set.add(s.sensor_pos.x)
-        x_set.add(s.beacon_pos.x)
-
-        y_set.add(s.sensor_pos.y)
-        y_set.add(s.beacon_pos.y)
-
-    min_x = min(x_set)
-    max_x = max(x_set)+1
-
-    min_y = min(y_set)
-    max_y = max(y_set)+1
-
-    width = max_x - min_x
-    height = max_y - min_y
-
-    result = []
-    for i in range(height):
-        row = []
-        for j in range(width):
-            row.append(UNKNOWN)
-
-        result.append(row)
-
-    world = World(result, min_x, min_y, max_x, max_y)
-    return world
 
 
 def day_15():
